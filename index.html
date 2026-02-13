@@ -5,26 +5,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PC Builder Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f0f0f0; color: #333; }
-        h1 { text-align: center; color: #0088cc; }
-        .step { margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; background: white; border-radius: 8px; }
-        .question { font-weight: bold; margin-bottom: 10px; }
-        button { padding: 10px 20px; margin: 5px; background: #0088cc; color: white; border: none; cursor: pointer; border-radius: 4px; }
-        button:hover { background: #007bb5; }
-        #summary { margin-top: 20px; padding: 15px; background: white; border: 1px solid #ddd; border-radius: 8px; }
-        #total { font-size: 1.2em; font-weight: bold; color: #0088cc; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .option-btn {
+            transition: all 0.2s ease;
+        }
+        .option-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .selected {
+            background-color: #3b82f6 !important;
+            border-color: #3b82f6 !important;
+        }
+        .progress {
+            transition: width 0.4s ease;
+        }
     </style>
 </head>
-<body>
-    <h1>Сборка ПК</h1>
-    <div id="steps"></div>
-    <div id="summary"></div>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="max-w-lg mx-auto p-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-4">
+                <i class="fa-solid fa-microchip text-4xl text-blue-500"></i>
+                <div>
+                    <h1 class="text-3xl font-bold">Сборка ПК</h1>
+                    <p class="text-gray-400">Шаг <span id="current-step">1</span> из 9</p>
+                </div>
+            </div>
+            <button onclick="tg.close()" class="text-gray-400 hover:text-white text-3xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="w-full bg-gray-800 rounded-full h-2 mb-10 overflow-hidden">
+            <div id="progress" class="h-2 bg-blue-500 rounded-full progress w-1/9"></div>
+        </div>
+
+        <!-- Current Step -->
+        <div id="current-step-container" class="bg-gray-800 rounded-3xl p-8 border border-gray-700"></div>
+
+        <!-- Summary (скрыто до конца) -->
+        <div id="summary" class="hidden mt-8"></div>
+    </div>
+
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
+        tg.expand();
 
-        // Цены (скопировано из бота)
+        // Адаптация под тему Telegram
+        if (tg.colorScheme === 'dark') {
+            document.body.classList.add('bg-gray-900');
+        }
+
         const PRICES = {
             // Процессоры AMD
             'AMD Ryzen 5 8500G': 19000,
@@ -127,152 +166,182 @@
         };
 
         const answers = {};
+        let currentStep = 0;
 
-        function showStep(stepId, question, options, nextStepCallback) {
-            const div = document.createElement('div');
-            div.className = 'step';
-            div.innerHTML = `<p class="question">${question}</p>`;
-            options.forEach(opt => {
+        const steps = [
+            { id: 'cpu', question: 'Процессор: AMD или Intel?', options: ['AMD', 'Intel'] },
+            { id: 'cpu_series', question: 'Выберите серию процессора', options: [] },
+            { id: 'cpu_model', question: 'Выберите модель процессора', options: [] },
+            { id: 'gpu_brand', question: 'Видеокарта: Nvidia, Radeon или Intel?', options: ['Nvidia', 'Radeon', 'Intel'] },
+            { id: 'gpu_generation', question: 'Выберите поколение видеокарты', options: [] },
+            { id: 'gpu_model', question: 'Выберите модель видеокарты', options: [] },
+            { id: 'ram_size', question: 'Сколько оперативной памяти?', options: ['16 ГБ', '32 ГБ', '64 ГБ', '128 ГБ'] },
+            { id: 'ssd_size', question: 'Какой объём SSD?', options: ['1 ТБ', '2 ТБ', '3 ТБ', '4 ТБ', '5 ТБ', '6 ТБ'] },
+            { id: 'budget', question: 'Ваш бюджет?', options: [] }
+        ];
+
+        function renderCurrentStep() {
+            const step = steps[currentStep];
+            const container = document.getElementById('current-step-container');
+            container.innerHTML = '';
+
+            const currentTotal = calculateTotal();
+            let questionText = step.question;
+            if (step.id === 'budget') {
+                questionText = `Ваш бюджет? (текущая сборка ≈ ${currentTotal / 1000}к ₽)`;
+            }
+
+            container.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6">${questionText}</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            `;
+
+            const optionsContainer = container.querySelector('div');
+            step.options.forEach(opt => {
                 const btn = document.createElement('button');
+                btn.className = `option-btn py-4 px-6 rounded-2xl border border-gray-600 bg-gray-700 hover:bg-gray-600 hover:border-blue-500 text-lg font-medium ${answers[step.id] === opt ? 'selected' : ''}`;
                 btn.textContent = opt;
-                btn.onclick = () => {
-                    answers[stepId] = opt;
-                    showPrice(opt);
-                    nextStepCallback(opt);
-                };
-                div.appendChild(btn);
+                btn.onclick = () => selectOption(opt);
+                optionsContainer.appendChild(btn);
             });
-            document.getElementById('steps').appendChild(div);
+
+            updateProgress();
         }
 
-        function showPrice(value) {
-            const price = PRICES[value] || 0;
-            const p = document.createElement('p');
-            p.textContent = `Цена: ${price} ₽`;
-            document.getElementById('steps').appendChild(p);
+        function selectOption(value) {
+            answers[steps[currentStep].id] = value;
+
+            if (currentStep < steps.length - 1) {
+                currentStep++;
+                renderCurrentStep();
+            } else {
+                showSummary();
+            }
+        }
+
+        function updateProgress() {
+            const progress = ((currentStep + 1) / steps.length) * 100;
+            document.getElementById('progress').style.width = `${progress}%`;
+            document.getElementById('current-step').textContent = currentStep + 1;
         }
 
         function calculateTotal() {
             let total = 0;
-            for (let key in answers) {
-                if (PRICES[answers[key]]) {
+            ['cpu_model', 'gpu_model', 'ram_size', 'ssd_size'].forEach(key => {
+                if (answers[key] && PRICES[answers[key]]) {
                     total += PRICES[answers[key]];
                 }
-            }
+            });
             return total;
         }
 
         function showSummary() {
             const total = calculateTotal();
-            let summaryText = 'Ваша сборка:<br>';
+            const container = document.getElementById('current-step-container');
+            container.classList.add('hidden');
+            document.getElementById('summary').classList.remove('hidden');
+
+            let html = '<h2 class="text-3xl font-bold mb-8 text-center">Ваша сборка готова!</h2>';
+            html += '<div class="space-y-4">';
             for (let key in answers) {
-                summaryText += `${key}: ${answers[key]}<br>`;
+                const value = answers[key];
+                const price = PRICES[value] || 0;
+                html += `
+                    <div class="flex justify-between items-center py-4 px-6 bg-gray-800 rounded-2xl">
+                        <span class="text-lg">${key}</span>
+                        <span class="text-lg font-medium">${value} ${price > 0 ? `<span class="text-blue-400">— ${price.toLocaleString()} ₽</span>` : ''}</span>
+                    </div>
+                `;
             }
-            summaryText += `<br>Итого: ${total} ₽`;
+            html += '</div>';
+            html += `<div class="mt-10 text-center">
+                <div class="text-3xl font-bold text-blue-400">Итого: ${total.toLocaleString()} ₽</div>
+            </div>`;
 
-            document.getElementById('summary').innerHTML = summaryText;
+            document.getElementById('summary').innerHTML = html;
 
-            // Отправка данных обратно в бот
-            tg.sendData(JSON.stringify(answers));
+            // Кнопка отправки через Telegram MainButton
+            tg.MainButton.setText('Отправить сборку');
+            tg.MainButton.show();
+            tg.MainButton.onClick(() => {
+                tg.sendData(JSON.stringify(answers));
+            });
         }
 
-        // Логика шагов
-        showStep('cpu', 'Процессор: AMD или Intel?', ['AMD', 'Intel'], (cpu) => {
-            answers['cpu'] = cpu;
-            showStep('cpu_series', 'Выберите серию:', cpu === 'AMD' ? ['5 серия', '7 серия', '9 серия'] : ['i-серия', 'ultra-серия'], (series) => {
-                answers['cpu_series'] = series;
-                if (cpu === 'AMD') {
+        // Динамическое определение options для каждого шага
+        function getOptionsForStep(stepId) {
+            if (stepId === 'cpu_series') {
+                return answers['cpu'] === 'AMD' ? ['5 серия', '7 серия', '9 серия'] : ['i-серия', 'ultra-серия'];
+            }
+            if (stepId === 'cpu_model') {
+                if (answers['cpu'] === 'AMD') {
                     const models = {
                         '5 серия': ['AMD Ryzen 5 8500G', 'AMD Ryzen 5 8600G'],
                         '7 серия': ['AMD Ryzen 7 7700', 'AMD Ryzen 7 7700X', 'AMD Ryzen 7 7800X3D', 'AMD Ryzen 7 8700G', 'AMD Ryzen 7 9700X', 'AMD Ryzen 7 9800X3D'],
                         '9 серия': ['AMD Ryzen 9 7900X', 'AMD Ryzen 9 7900X3D', 'AMD Ryzen 9 7950X', 'AMD Ryzen 9 7950X3D', 'AMD Ryzen 9 9900X', 'AMD Ryzen 9 9900X3D', 'AMD Ryzen 9 9950X', 'AMD Ryzen 9 9950X3D']
                     };
-                    showStep('cpu_model', 'Выберите модель процессора:', models[series], (model) => {
-                        answers['cpu_model'] = model;
-                        gpuBrandStep();
-                    });
+                    return models[answers['cpu_series']] || [];
                 } else {
-                    showStep('cpu_generation', 'Выберите поколение:', ['5 серия', '7 серия', '9 серия'], (gen) => {
-                        answers['cpu_generation'] = gen;
-                        const models = series === 'i-серия' ? {
+                    if (answers['cpu_series'] === 'i-серия') {
+                        const models = {
                             '5 серия': ['intel i5 12400', 'intel i5 14400', 'intel i5 14400f', 'intel i5 14600kf'],
                             '7 серия': ['intel i7 13700', 'intel i7 14700F', 'intel i7 14700'],
                             '9 серия': ['intel i9 14900', 'intel i9 14900kf', 'intel i9 14900k']
-                        } : {
+                        };
+                        return models[answers['cpu_generation']] || [];
+                    } else {
+                        const models = {
                             '5 серия': ['Intel Core Ultra 5 225F OEM', 'Intel Core Ultra 5 225 OEM', 'Intel Core Ultra 5 245KF OEM', 'Intel Core Ultra 5 245K OEM'],
                             '7 серия': ['Intel Core Ultra 7 265KF OEM', 'Intel Core Ultra 7 265K OEM'],
                             '9 серия': ['Intel Core Ultra 9 285K oem']
                         };
-                        showStep('cpu_model', 'Выберите модель процессора:', models[gen], (model) => {
-                            answers['cpu_model'] = model;
-                            gpuBrandStep();
-                        });
-                    });
+                        return models[answers['cpu_generation']] || [];
+                    }
                 }
-            });
-        });
-
-        function gpuBrandStep() {
-            showStep('gpu_brand', 'Видеокарта: Nvidia, Radeon или Intel?', ['Nvidia', 'Radeon', 'Intel'], (brand) => {
-                answers['gpu_brand'] = brand;
-                if (brand === 'Intel') {
-                    showStep('gpu_model', 'Модель видеокарты:', ['Arc B580', 'Arc B570'], (model) => {
-                        answers['gpu_model'] = model;
-                        ramStep();
-                    });
-                } else {
-                    const gens = brand === 'Nvidia' ? ['30 серии', '40 серии', '50 серии'] : ['6000 серии', '7000 серии', '9000 серии'];
-                    showStep('gpu_generation', 'Поколение:', gens, (gen) => {
-                        answers['gpu_generation'] = gen;
-                        const models = brand === 'Nvidia' ? {
-                            '30 серии': ['3060', '3060ti', '3070', '3070ti', '3080', '3080ti', '3090', '3090ti'],
-                            '40 серии': ['4060', '4060ti(8gb)', '4060ti(16gb)', '4070', '4070 super', '4070ti', '4070ti super', '4080', '4080 super', '4090'],
-                            '50 серии': ['5060', '5060ti(8gb)', '5060ti(16gb)', '5070', '5070ti', '5080', '5090']
-                        } : {
-                            '6000 серии': ['Radeon RX 6750 GRE 10 GB', 'Radeon RX 6750 GRE 12 GB'],
-                            '7000 серии': ['Radeon RX 7400', 'Radeon RX 7600', 'Radeon RX 7600 XT', 'Radeon RX 7700 XT', 'Radeon RX 7800 XT', 'Radeon RX 7900 GRE'],
-                            '9000 серии': ['Radeon RX 7650 GRE', 'Radeon RX 9060', 'Radeon RX 9060 XT', 'Radeon RX 9060 XT 8 GB', 'Radeon RX 9060 XT 16 GB', 'Radeon RX 9070', 'Radeon RX 9070 GRE', 'Radeon RX 9070 XT']
-                        };
-                        showStep('gpu_model', 'Модель видеокарты:', models[gen] || [], (model) => {
-                            answers['gpu_model'] = model;
-                            ramStep();
-                        });
-                    });
-                }
-            });
-        }
-
-        function ramStep() {
-            showStep('ram_size', 'Сколько оперативной памяти нужно?', ['16 ГБ', '32 ГБ', '64 ГБ', '128 ГБ'], (ram) => {
-                answers['ram_size'] = ram;
-                ssdStep();
-            });
-        }
-
-        function ssdStep() {
-            showStep('ssd_size', 'Какой объём SSD?', ['1 ТБ', '2 ТБ', '3 ТБ', '4 ТБ', '5 ТБ', '6 ТБ'], (ssd) => {
-                answers['ssd_size'] = ssd;
-                budgetStep();
-            });
-        }
-
-        function budgetStep() {
-            const currentTotal = calculateTotal();
-            let budgetOptions = [];
-            if (currentTotal <= 100000) {
-                budgetOptions = ['до 100к', 'до 200к', 'до 300к', 'до 400к', 'до 500к', '500+к'];
-            } else {
-                const base = [200000, 300000, 400000, 500000].filter(b => b > currentTotal).map(b => `до ${b / 1000}к`);
-                const lower = currentTotal - 50000;
-                if (lower >= 100000) base.push(`до ${lower / 1000}к`);
-                base.sort((a, b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]));
-                budgetOptions = base.concat('500+к');
             }
-            showStep('budget', `Ваш бюджет? (текущая сборка ≈ ${currentTotal / 1000}к ₽)`, budgetOptions, (budget) => {
-                answers['budget'] = budget;
-                showSummary();
-            });
+            if (stepId === 'gpu_generation') {
+                return answers['gpu_brand'] === 'Nvidia' ? ['30 серии', '40 серии', '50 серии'] : ['6000 серии', '7000 серии', '9000 серии'];
+            }
+            if (stepId === 'gpu_model') {
+                if (answers['gpu_brand'] === 'Intel') {
+                    return ['Arc B580', 'Arc B570'];
+                }
+                const models = answers['gpu_brand'] === 'Nvidia' ? {
+                    '30 серии': ['3060', '3060ti', '3070', '3070ti', '3080', '3080ti', '3090', '3090ti'],
+                    '40 серии': ['4060', '4060ti(8gb)', '4060ti(16gb)', '4070', '4070 super', '4070ti', '4070ti super', '4080', '4080 super', '4090'],
+                    '50 серии': ['5060', '5060ti(8gb)', '5060ti(16gb)', '5070', '5070ti', '5080', '5090']
+                } : {
+                    '6000 серии': ['Radeon RX 6750 GRE 10 GB', 'Radeon RX 6750 GRE 12 GB'],
+                    '7000 серии': ['Radeon RX 7400', 'Radeon RX 7600', 'Radeon RX 7600 XT', 'Radeon RX 7700 XT', 'Radeon RX 7800 XT', 'Radeon RX 7900 GRE'],
+                    '9000 серии': ['Radeon RX 7650 GRE', 'Radeon RX 9060', 'Radeon RX 9060 XT', 'Radeon RX 9060 XT 8 GB', 'Radeon RX 9060 XT 16 GB', 'Radeon RX 9070', 'Radeon RX 9070 GRE', 'Radeon RX 9070 XT']
+                };
+                return models[answers['gpu_generation']] || [];
+            }
+            if (stepId === 'budget') {
+                const currentTotal = calculateTotal();
+                let options = [];
+                if (currentTotal <= 100000) {
+                    options = ['до 100к', 'до 200к', 'до 300к', 'до 400к', 'до 500к', '500+к'];
+                } else {
+                    const base = [200000, 300000, 400000, 500000].filter(b => b > currentTotal).map(b => `до ${b / 1000}к`);
+                    const lower = currentTotal - 50000;
+                    if (lower >= 100000) {
+                        const lowerStr = `до ${lower / 1000}к`;
+                        if (!base.includes(lowerStr)) base.push(lowerStr);
+                    }
+                    base.sort((a, b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]));
+                    options = base.concat('500+к');
+                }
+                return options;
+            }
+            return steps.find(s => s.id === stepId).options || [];
         }
+
+        // Запуск
+        steps.forEach(step => {
+            if (step.id !== 'cpu') step.options = getOptionsForStep(step.id);
+        });
+        renderCurrentStep();
     </script>
 </body>
 </html>
