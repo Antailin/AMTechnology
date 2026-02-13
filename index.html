@@ -2,29 +2,109 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PC Builder Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #121212; color: #e0e0e0; }
-        h1 { text-align: center; color: #bb86fc; }
-        .step { margin-bottom: 20px; padding: 15px; background: #1e1e1e; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
-        .question { font-weight: bold; font-size: 1.2em; margin-bottom: 15px; color: #03dac6; }
-        button { padding: 12px 20px; margin: 8px; background: #3700b3; color: white; border: none; cursor: pointer; border-radius: 8px; font-size: 1em; width: calc(100% - 16px); }
-        button:hover { background: #6200ee; }
-        #summary { margin-top: 30px; padding: 20px; background: #1e1e1e; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
-        #summary h2 { color: #03dac6; text-align: center; }
-        .component { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #333; }
-        .total { font-size: 1.4em; font-weight: bold; color: #bb86fc; text-align: center; margin-top: 20px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background: var(--tg-theme-bg-color, #121212); 
+            color: var(--tg-theme-text-color, #e0e0e0); 
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 { 
+            text-align: center; 
+            color: var(--tg-theme-button-color, #bb86fc); 
+            margin-bottom: 30px; 
+            font-size: 1.8em;
+        }
+        .step { 
+            background: var(--tg-theme-secondary-bg-color, #1e1e1e); 
+            border-radius: 16px; 
+            padding: 24px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
+            margin-bottom: 20px;
+        }
+        .question { 
+            font-weight: 600; 
+            font-size: 1.3em; 
+            margin-bottom: 20px; 
+            color: var(--tg-theme-link-color, #03dac6); 
+        }
+        .options {
+            display: grid;
+            gap: 12px;
+        }
+        button { 
+            padding: 16px 20px; 
+            background: var(--tg-theme-button-color, #3700b3); 
+            color: var(--tg-theme-button-text-color, white); 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 1.1em; 
+            cursor: pointer; 
+            width: 100%;
+            transition: background 0.2s;
+        }
+        button:hover { 
+            background: var(--tg-theme-button-color, #6200ee); 
+        }
+        #summary {
+            display: none;
+            background: var(--tg-theme-secondary-bg-color, #1e1e1e); 
+            border-radius: 16px; 
+            padding: 24px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        .summary-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            text-align: center;
+            color: var(--tg-theme-link-color, #03dac6);
+            margin-bottom: 24px;
+        }
+        .component {
+            display: flex;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-bottom: 1px solid #333;
+            font-size: 1.1em;
+        }
+        .component:last-child {
+            border-bottom: none;
+        }
+        .total {
+            font-size: 1.8em;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 30px;
+            color: var(--tg-theme-link-color, #bb86fc);
+        }
+        #send-btn {
+            margin-top: 30px;
+            background: var(--tg-theme-button-color, #03dac6);
+            font-size: 1.3em;
+            padding: 18px;
+        }
     </style>
 </head>
 <body>
-    <h1>Сборка ПК</h1>
-    <div id="steps"></div>
-    <div id="summary" style="display: none;"></div>
+    <div class="container">
+        <h1>Сборка ПК</h1>
+        <div id="steps"></div>
+        <div id="summary"></div>
+    </div>
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
+        tg.expand(); // Полноэкранный режим на мобильных
 
         const PRICES = {
             // Процессоры AMD
@@ -144,6 +224,7 @@
                 question = answers['cpu'] === 'AMD' ? 'Выберите серию AMD Ryzen:' : 'Выберите серию Intel:';
                 options = answers['cpu'] === 'AMD' ? ['5 серия', '7 серия', '9 серия'] : ['i-серия', 'ultra-серия'];
             } else if (currentStep === 'cpu_generation') {
+                // Этот шаг только для Intel
                 question = 'Выберите поколение:';
                 options = ['5 серия', '7 серия', '9 серия'];
             } else if (currentStep === 'cpu_model') {
@@ -157,7 +238,7 @@
                     options = models[answers['cpu_series']] || [];
                 } else {
                     const series = answers['cpu_series'];
-                    const gen = answers['cpu_generation'];
+                    const gen = answers['cpu_generation'] || answers['cpu_series']; // fallback if no generation
                     if (series === 'i-серия') {
                         const models = {
                             '5 серия': ['intel i5 12400', 'intel i5 14400', 'intel i5 14400f', 'intel i5 14600kf'],
@@ -210,7 +291,7 @@
                 options = ['1 ТБ', '2 ТБ', '3 ТБ', '4 ТБ', '5 ТБ', '6 ТБ'];
             } else if (currentStep === 'budget') {
                 const currentTotal = calculateTotal();
-                question = `Ваш бюджет? (текущая сборка ≈ ${currentTotal // 1000}к ₽)`;
+                question = `Ваш бюджет? (текущая сборка ≈ ${Math.round(currentTotal / 1000)}к ₽)`;
                 let budgetOptions = [];
                 if (currentTotal <= 100000) {
                     budgetOptions = ['до 100к', 'до 200к', 'до 300к', 'до 400к', 'до 500к', '500+к'];
@@ -218,7 +299,7 @@
                     const base = [200000, 300000, 400000, 500000].filter(b => b > currentTotal).map(b => `до ${b / 1000}к`);
                     const lower = currentTotal - 50000;
                     if (lower >= 100000) {
-                        const lowerStr = `до ${lower / 1000}к`;
+                        const lowerStr = `до ${Math.round(lower / 1000)}к`;
                         if (!base.includes(lowerStr)) base.push(lowerStr);
                     }
                     base.sort((a, b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]));
@@ -227,14 +308,21 @@
                 options = budgetOptions;
             }
 
+            if (options.length === 0) {
+                // Если нет опций — ошибка, переходим дальше
+                nextStep();
+                return;
+            }
+
             const stepDiv = document.createElement('div');
             stepDiv.className = 'step';
-            stepDiv.innerHTML = `<div class="question">${question}</div>`;
+            stepDiv.innerHTML = `<div class="question">${question}</div><div class="options"></div>`;
+            const optionsDiv = stepDiv.querySelector('.options');
             options.forEach(opt => {
                 const btn = document.createElement('button');
                 btn.textContent = opt;
                 btn.onclick = () => selectOption(opt);
-                stepDiv.appendChild(btn);
+                optionsDiv.appendChild(btn);
             });
             container.appendChild(stepDiv);
         }
@@ -242,7 +330,10 @@
         function selectOption(value) {
             answers[currentStep] = value;
 
-            // Определяем следующий шаг
+            nextStep();
+        }
+
+        function nextStep() {
             if (currentStep === 'cpu') {
                 currentStep = 'cpu_series';
             } else if (currentStep === 'cpu_series') {
@@ -256,7 +347,7 @@
             } else if (currentStep === 'cpu_model') {
                 currentStep = 'gpu_brand';
             } else if (currentStep === 'gpu_brand') {
-                if (value === 'Intel') {
+                if (answers['gpu_brand'] === 'Intel') {
                     currentStep = 'gpu_model';
                 } else {
                     currentStep = 'gpu_generation';
@@ -291,22 +382,30 @@
             const summary = document.getElementById('summary');
             summary.style.display = 'block';
 
-            let html = '<h2>Ваша сборка готова!</h2>';
-            html += '<div class="components">';
+            let html = '<div class="summary-title">Ваша сборка готова!</div>';
+            html += '<div class="options">';
             for (let key in answers) {
                 const value = answers[key];
                 const price = PRICES[value] || 0;
-                html += `<div class="component"><span>${key}:</span><span>${value} ${price > 0 ? '— ' + price + ' ₽' : ''}</span></div>`;
+                html += `<div class="component"><span>${key}:</span><span>${value} ${price > 0 ? '— ' + price.toLocaleString() + ' ₽' : ''}</span></div>`;
             }
             html += '</div>';
-            html += `<div class="total">Итого: ${calculateTotal()} ₽</div>`;
-            html += '<button id="send-btn" style="margin-top: 30px; background: #03dac6; font-size: 1.2em; padding: 15px;">Отправить сборку</button>';
+            html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
+            html += '<button id="send-btn">Отправить сборку</button>';
 
             summary.innerHTML = html;
 
+            // Кнопка отправки
             document.getElementById('send-btn').onclick = () => {
                 tg.sendData(JSON.stringify(answers));
             };
+
+            // Дополнительно: нативная кнопка Telegram (на телефоне)
+            tg.MainButton.setText('Отправить сборку');
+            tg.MainButton.show();
+            tg.MainButton.onClick(() => {
+                tg.sendData(JSON.stringify(answers));
+            });
         }
 
         // Старт
