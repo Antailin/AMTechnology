@@ -84,12 +84,6 @@
             margin-top: 30px;
             color: #bb86fc;
         }
-        #error-reload {
-            display: none;
-            text-align: center;
-            margin-top: 100px;
-            color: #ff5555;
-        }
     </style>
 </head>
 <body>
@@ -97,31 +91,10 @@
         <h1>Сборка ПК</h1>
         <div id="steps"></div>
         <div id="summary"></div>
-        <div id="error-reload">
-            <h2>Не удалось загрузить приложение</h2>
-            <p>Попробуйте:</p>
-            <button onclick="location.reload()">Перезагрузить</button>
-            <p>или открыть в мобильном Telegram</p>
-        </div>
     </div>
 
     <script>
-        let tg = window.Telegram?.WebApp;
-
-        // Fallback для десктопа / случаев, когда WebApp не загрузился
-        if (!tg || !tg.initData) {
-            tg = {
-                ready: () => {},
-                expand: () => {},
-                sendData: (data) => console.log('Fallback sendData:', data),
-                MainButton: {
-                    setText: (text) => console.log('Mock setText:', text),
-                    show: () => console.log('Mock show'),
-                    onClick: (cb) => console.log('Mock onClick')
-                }
-            };
-        }
-
+        const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
@@ -243,7 +216,7 @@
                         };
                         return m[answers.cpu_series] || [];
                     } else {
-                        const gen = answers.cpu_generation || '5 серия'; // fallback если не выбрано
+                        const gen = answers.cpu_generation || '5 серия'; // fallback
                         const m = answers.cpu_series === 'i-серия' ? {
                             '5 серия': ['intel i5 12400', 'intel i5 14400', 'intel i5 14400f', 'intel i5 14600kf'],
                             '7 серия': ['intel i7 13700', 'intel i7 14700F', 'intel i7 14700'],
@@ -328,12 +301,11 @@
                     answers[currentStep] = opt;
                     history.push(currentStep);
 
-                    // Логика перехода
                     if (currentStep === 'cpu_series') {
                         if (answers.cpu === 'AMD') {
                             currentStep = 'cpu_model';
                         } else {
-                            currentStep = 'cpu_model'; // ← для Intel убрал поколение, чтобы упростить
+                            currentStep = 'cpu_model'; // упростил для Intel
                         }
                     } else {
                         const next = getNextStep();
@@ -376,65 +348,55 @@
             return total;
         }
 
+        // Принудительная отправка через fetch (fallback для GitHub Pages и проблем с sendData)
+        function fallbackSend() {
+            const data = JSON.stringify(answers);
+            const token = '8435864770:AAE7ImIPdSzaK7Q86LV4b55qfr49ej18zXw';  // ← ОБЯЗАТЕЛЬНО ЗАМЕНИ НА СВОЙ ТОКЕН
+            const chatId = tg.initDataUnsafe?.user?.id || -1003744446339; // ← твой chat_id для теста
+
+            fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: 'Данные из Mini App (fallback):\n' + data
+                })
+            })
+            .then(response => response.json())
+            .then(result => console.log('Fallback отправлено:', result))
+            .catch(err => console.error('Ошибка fallback:', err))
+            .finally(() => tg.close());
+        }
+
         function showSummary() {
-    document.getElementById('steps').style.display = 'none';
-    const summary = document.getElementById('summary');
-    summary.style.display = 'block';
+            document.getElementById('steps').style.display = 'none';
+            const summary = document.getElementById('summary');
+            summary.style.display = 'block';
 
-    let html = '<div class="summary-title">Ваша сборка готова!</div>';
-    html += '<div class="options">';
-    for (let key in answers) {
-        const label = labels[key] || key;
-        const value = answers[key];
-        html += `<div class="component"><span>${label}:</span><span>${value}</span></div>`;
-    }
-    html += '</div>';
-    html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
-
-    // Инструкция для пользователя
-    html += '<p style="text-align:center; margin-top:20px; color:#bbb;">Нажмите кнопку внизу экрана</p>';
-
-    summary.innerHTML = html;
-
-    // Самое важное — отправляем данные ДО закрытия
-    const sendAndClose = () => {
-        tg.sendData(JSON.stringify(answers));
-        setTimeout(() => tg.close(), 600); // даём 600 мс на отправку
-    };
-
-    tg.MainButton.setText('Отправить сборку');
-    tg.MainButton.show();
-    tg.MainButton.onClick(sendAndClose);
-
-    // Дополнительная защита — если MainButton не сработал
-    setTimeout(() => {
-        if (tg.MainButton.isVisible) {
-            sendAndClose();
-        }
-    }, 8000); // автоотправка через 8 секунд, если пользователь не нажал
-}
-
-        // Запуск с защитой от десктопных проблем
-        function startApp(attempt = 0) {
-            if (attempt > 10) {
-                document.getElementById('error-reload').style.display = 'block';
-                return;
+            let html = '<div class="summary-title">Ваша сборка готова!</div>';
+            html += '<div class="options">';
+            for (let key in answers) {
+                const label = labels[key] || key;
+                const value = answers[key];
+                html += `<div class="component"><span>${label}:</span><span>${value}</span></div>`;
             }
+            html += '</div>';
+            html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
 
-            if (tg && tg.initData) {
-                tg.ready();
-                tg.expand();
-                renderStep();
-            } else {
-                setTimeout(() => startApp(attempt + 1), 400);
-            }
+            summary.innerHTML = html;
+
+            // Основная отправка + fallback
+            const dataToSend = JSON.stringify(answers);
+            console.log("Попытка отправить через tg.sendData:", dataToSend);
+
+            tg.sendData(dataToSend);
+
+            // Fallback через 500 мс
+            setTimeout(fallbackSend, 500);
         }
 
-        startApp();
-
-        // Принудительный рендер каждые 2 секунды на десктопе
-        setInterval(renderStep, 2000);
+        // Запуск
+        renderStep();
     </script>
 </body>
 </html>
-
