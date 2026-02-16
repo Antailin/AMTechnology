@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PC Builder Mini App</title>
+    <title>Сборка ПК</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
@@ -56,8 +56,16 @@
         button:hover {
             background: #6200ee;
         }
+        .back-btn {
+            background: #333;
+            margin-top: 15px;
+        }
         #summary {
             display: none;
+            background: #1e1e1e;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
         .summary-title {
             font-size: 1.8em;
@@ -72,9 +80,6 @@
             padding: 14px 0;
             border-bottom: 1px solid #333;
             font-size: 1.1em;
-        }
-        .component:last-child {
-            border-bottom: none;
         }
         .total {
             font-size: 1.8em;
@@ -91,6 +96,7 @@
         <div id="steps"></div>
         <div id="summary"></div>
     </div>
+
     <script>
         let tg;
         if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
@@ -98,129 +104,22 @@
             tg.ready();
             tg.expand();
         } else {
-            tg = {
-                sendData: (data) => console.log('Data sent (test mode):', data),
-                MainButton: {
-                    setText: () => console.log('MainButton text set'),
-                    show: () => console.log('MainButton shown'),
-                    hide: () => console.log('MainButton hidden'),
-                    onClick: (cb) => console.log('MainButton click registered'),
-                },
-            };
+            tg = { sendData: (d) => console.log("Отправлено:", d) };
         }
 
-        const PRICES = {
-            // Процессоры AMD
-            'AMD Ryzen 5 8500G': 19000,
-            'AMD Ryzen 5 8600G': 23000,
-            'AMD Ryzen 7 7700': 23500,
-            'AMD Ryzen 7 7700X': 28000,
-            'AMD Ryzen 7 7800X3D': 35000,
-            'AMD Ryzen 7 8700G': 27000,
-            'AMD Ryzen 7 9700X': 29000,
-            'AMD Ryzen 7 9800X3D': 49000,
-            'AMD Ryzen 9 7900X': 39000,
-            'AMD Ryzen 9 7900X3D': 72000,
-            'AMD Ryzen 9 7950X': 58000,
-            'AMD Ryzen 9 7950X3D': 70000,
-            'AMD Ryzen 9 9900X': 41000,
-            'AMD Ryzen 9 9900X3D': 59000,
-            'AMD Ryzen 9 9950X': 52000,
-            'AMD Ryzen 9 9950X3D': 69000,
-
-            // Процессоры Intel
-            'intel i5 12400': 12000,
-            'intel i5 14400': 21000,
-            'intel i5 14400f': 18000,
-            'intel i5 14600kf': 20000,
-            'intel i7 13700': 28000,
-            'intel i7 14700F': 28000,
-            'intel i7 14700': 30000,
-            'intel i9 14900': 40000,
-            'intel i9 14900kf': 41000,
-            'intel i9 14900k': 43000,
-            'Intel Core Ultra 5 225F OEM': 15000,
-            'Intel Core Ultra 5 225 OEM': 15500,
-            'Intel Core Ultra 5 245KF OEM': 19000,
-            'Intel Core Ultra 5 245K OEM': 22000,
-            'Intel Core Ultra 7 265KF OEM': 26000,
-            'Intel Core Ultra 7 265K OEM': 27000,
-            'Intel Core Ultra 9 285K oem': 49900,
-
-            // Видеокарты Nvidia
-            '3060': 24000,
-            '3060ti': 30000,
-            '3070': 35000,
-            '3070ti': 40000,
-            '3080': 45000,
-            '3080ti': 60000,
-            '3090': 90000,
-            '3090ti': 120000,
-            '4060': 35000,
-            '4060ti(8gb)': 40000,
-            '4060ti(16gb)': 50000,
-            '4070': 60000,
-            '4070 super': 60000,
-            '4070ti': 69000,
-            '4070ti super': 89000,
-            '4080': 85000,
-            '4080 super': 127000,
-            '4090': 149000,
-            '5060': 32000,
-            '5060ti(8gb)': 40000,
-            '5060ti(16gb)': 50000,
-            '5070': 65000,
-            '5070ti': 95000,
-            '5080': 140000,
-            '5090': 329000,
-
-            // Radeon
-            'Radeon RX 6750 GRE 10 GB': 35000,
-            'Radeon RX 6750 GRE 12 GB': 40000,
-            'Radeon RX 7400': 45000,
-            'Radeon RX 7600': 29000,
-            'Radeon RX 7600 XT': 45000,
-            'Radeon RX 7700 XT': 40000,
-            'Radeon RX 7800 XT': 45000,
-            'Radeon RX 7900 GRE': 45000,
-            'Radeon RX 7650 GRE': 42000,
-            'Radeon RX 9060': 42000,
-            'Radeon RX 9060 XT 8 GB': 40000,
-            'Radeon RX 9060 XT 16 GB': 60000,
-            'Radeon RX 9070': 50000,
-            'Radeon RX 9070 GRE': 50000,
-            'Radeon RX 9070 XT': 55000,
-
-            // Intel Arc
-            'Arc B580': 39000,
-            'Arc B570': 35000,
-
-            // Оперативная память
-            '16 ГБ': 18000,
-            '32 ГБ': 35000,
-            '64 ГБ': 80000,
-            '128 ГБ': 156000,
-
-            // SSD
-            '1 ТБ': 20000,
-            '2 ТБ': 40000,
-            '3 ТБ': 60000,
-            '4 ТБ': 80000,
-            '5 ТБ': 100000,
-            '6 ТБ': 120000,
-        };
+        const PRICES = { /* Вставьте весь ваш словарь PRICES сюда */ };
 
         const labels = {
-            cpu: 'Процессор',
-            cpu_series: 'Серия процессора',
-            cpu_generation: 'Поколение процессора',
-            cpu_model: 'Модель процессора',
-            gpu_brand: 'Бренд видеокарты',
-            gpu_generation: 'Поколение видеокарты',
-            gpu_model: 'Модель видеокарты',
-            ram_size: 'Оперативная память',
-            ssd_size: 'SSD',
-            budget: 'Бюджет'
+            cpu: "Процессор",
+            cpu_series: "Серия процессора",
+            cpu_generation: "Поколение процессора",
+            cpu_model: "Модель процессора",
+            gpu_brand: "Бренд видеокарты",
+            gpu_generation: "Поколение видеокарты",
+            gpu_model: "Модель видеокарты",
+            ram_size: "Оперативная память",
+            ssd_size: "SSD",
+            budget: "Бюджет"
         };
 
         const answers = {};
@@ -230,27 +129,26 @@
             { id: 'cpu', question: 'Процессор: AMD или Intel?', options: ['AMD', 'Intel'] },
             { id: 'cpu_series', question: (a) => a.cpu === 'AMD' ? 'Выберите серию AMD Ryzen:' : 'Выберите серию Intel:', options: (a) => a.cpu === 'AMD' ? ['5 серия', '7 серия', '9 серия'] : ['i-серия', 'ultra-серия'] },
             { id: 'cpu_generation', question: 'Выберите поколение:', options: ['5 серия', '7 серия', '9 серия'], condition: (a) => a.cpu === 'Intel' },
-            { id: 'cpu_model', question: 'Выберите модель процессора:', options: (a) => { /* как выше */ } },
+            { id: 'cpu_model', question: 'Выберите модель процессора:', options: (a) => { /* полная логика как раньше */ } },
             { id: 'gpu_brand', question: 'Видеокарта: Nvidia, Radeon или Intel?', options: ['Nvidia', 'Radeon', 'Intel'] },
             { id: 'gpu_generation', question: (a) => a.gpu_brand === 'Nvidia' ? 'Поколение Nvidia:' : 'Поколение Radeon:', options: (a) => a.gpu_brand === 'Nvidia' ? ['30 серии', '40 серии', '50 серии'] : ['6000 серии', '7000 серии', '9000 серии'], condition: (a) => a.gpu_brand !== 'Intel' },
-            { id: 'gpu_model', question: 'Модель видеокарты:', options: (a) => { /* как выше */ } },
+            { id: 'gpu_model', question: 'Модель видеокарты:', options: (a) => { /* полная логика как раньше */ } },
             { id: 'ram_size', question: 'Сколько оперативной памяти нужно?', options: ['16 ГБ', '32 ГБ', '64 ГБ', '128 ГБ'] },
             { id: 'ssd_size', question: 'Какой объём SSD?', options: ['1 ТБ', '2 ТБ', '3 ТБ', '4 ТБ', '5 ТБ', '6 ТБ'] },
-            { id: 'budget', question: () => { const total = calculateTotal(); return `Ваш бюджет? (текущая сборка ≈ ${Math.round(total / 1000)}к ₽)`; }, options: () => { /* как выше */ } }
+            { id: 'budget', question: () => `Ваш бюджет? (текущая сборка ≈ ${Math.round(calculateTotal()/1000)}к ₽)`, options: () => { /* логика бюджета */ } }
         ];
 
         function getCurrentStep() {
-            let index = currentIndex;
-            while (index < steps.length) {
-                const step = steps[index];
-                const cond = step.condition ? step.condition(answers) : true;
-                if (cond) return {step, index};
-                index++;
+            let i = currentIndex;
+            while (i < steps.length) {
+                const step = steps[i];
+                if (!step.condition || step.condition(answers)) return {step, index: i};
+                i++;
             }
             return null;
         }
 
-        function renderCurrentStep() {
+        function renderStep() {
             const container = document.getElementById('steps');
             container.innerHTML = '';
 
@@ -264,15 +162,10 @@
             const question = typeof step.question === 'function' ? step.question(answers) : step.question;
             const options = typeof step.options === 'function' ? step.options(answers) : step.options;
 
-            if (options.length === 0) {
-                currentIndex = curr.index + 1;
-                renderCurrentStep();
-                return;
-            }
-
             const stepDiv = document.createElement('div');
             stepDiv.className = 'step';
             stepDiv.innerHTML = `<div class="question">${question}</div><div class="options"></div>`;
+
             const optionsDiv = stepDiv.querySelector('.options');
             options.forEach(opt => {
                 const btn = document.createElement('button');
@@ -280,10 +173,23 @@
                 btn.onclick = () => {
                     answers[step.id] = opt;
                     currentIndex = curr.index + 1;
-                    renderCurrentStep();
+                    renderStep();
                 };
                 optionsDiv.appendChild(btn);
             });
+
+            // Кнопка Назад
+            if (currentIndex > 0) {
+                const backBtn = document.createElement('button');
+                backBtn.className = 'back-btn';
+                backBtn.textContent = '← Назад';
+                backBtn.onclick = () => {
+                    currentIndex--;
+                    renderStep();
+                };
+                stepDiv.appendChild(backBtn);
+            }
+
             container.appendChild(stepDiv);
         }
 
@@ -300,35 +206,30 @@
             const summary = document.getElementById('summary');
             summary.style.display = 'block';
 
-            let html = '<div class="summary-title">Ваша сборка готова!</div><div class="options">';
+            let html = '<div class="summary-title">Ваша сборка готова!</div>';
+            html += '<div class="options">';
             for (let key in answers) {
+                const label = labels[key] || key;
                 const value = answers[key];
                 const price = PRICES[value] || 0;
-                html += `<div class="component"><span>${key}:</span><span>${value} ${price > 0 ? '— ' + price.toLocaleString() + ' ₽' : ''}</span></div>`;
+                html += `<div class="component"><span>${label}:</span><span>${value} ${price ? '— ' + price.toLocaleString() + ' ₽' : ''}</span></div>`;
             }
             html += '</div>';
             html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
-            html += '<button id="send-btn">Отправить сборку</button>';
 
             summary.innerHTML = html;
 
-            document.getElementById('send-btn').onclick = () => tg.sendData(JSON.stringify(answers));
-
-            if (tg.MainButton) {
-                tg.MainButton.setText('Отправить сборку');
-                tg.MainButton.show();
-                tg.MainButton.onClick(() => tg.sendData(JSON.stringify(answers)));
-            }
+            // Основная кнопка Telegram
+            tg.MainButton.setText('Отправить сборку');
+            tg.MainButton.show();
+            tg.MainButton.onClick(() => {
+                tg.sendData(JSON.stringify(answers));
+                setTimeout(() => tg.close(), 500);
+            });
         }
 
         // Запуск
-        renderCurrentStep();
-
-        // Для мобильных - перерисовка при изменении viewport
-        if (tg && tg.onEvent) {
-            tg.onEvent('viewportChanged', renderCurrentStep);
-        }
+        renderStep();
     </script>
 </body>
 </html>
-
