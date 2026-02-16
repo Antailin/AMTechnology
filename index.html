@@ -84,6 +84,12 @@
             margin-top: 30px;
             color: #bb86fc;
         }
+        #error-reload {
+            display: none;
+            text-align: center;
+            margin-top: 100px;
+            color: #ff5555;
+        }
     </style>
 </head>
 <body>
@@ -91,10 +97,31 @@
         <h1>Сборка ПК</h1>
         <div id="steps"></div>
         <div id="summary"></div>
+        <div id="error-reload">
+            <h2>Не удалось загрузить приложение</h2>
+            <p>Попробуйте:</p>
+            <button onclick="location.reload()">Перезагрузить</button>
+            <p>или открыть в мобильном Telegram</p>
+        </div>
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
+        let tg = window.Telegram?.WebApp;
+
+        // Fallback для десктопа / случаев, когда WebApp не загрузился
+        if (!tg || !tg.initData) {
+            tg = {
+                ready: () => {},
+                expand: () => {},
+                sendData: (data) => console.log('Fallback sendData:', data),
+                MainButton: {
+                    setText: (text) => console.log('Mock setText:', text),
+                    show: () => console.log('Mock show'),
+                    onClick: (cb) => console.log('Mock onClick')
+                }
+            };
+        }
+
         tg.ready();
         tg.expand();
 
@@ -115,7 +142,6 @@
             'AMD Ryzen 9 9900X3D': 59000,
             'AMD Ryzen 9 9950X': 52000,
             'AMD Ryzen 9 9950X3D': 69000,
-
             'intel i5 12400': 12000,
             'intel i5 14400': 21000,
             'intel i5 14400f': 18000,
@@ -133,7 +159,6 @@
             'Intel Core Ultra 7 265KF OEM': 26000,
             'Intel Core Ultra 7 265K OEM': 27000,
             'Intel Core Ultra 9 285K oem': 49900,
-
             '3060': 24000,
             '3060ti': 30000,
             '3070': 35000,
@@ -159,7 +184,6 @@
             '5070ti': 95000,
             '5080': 140000,
             '5090': 329000,
-
             'Radeon RX 6750 GRE 10 GB': 35000,
             'Radeon RX 6750 GRE 12 GB': 40000,
             'Radeon RX 7400': 45000,
@@ -175,15 +199,12 @@
             'Radeon RX 9070': 50000,
             'Radeon RX 9070 GRE': 50000,
             'Radeon RX 9070 XT': 55000,
-
             'Arc B580': 39000,
             'Arc B570': 35000,
-
             '16 ГБ': 18000,
             '32 ГБ': 35000,
             '64 ГБ': 80000,
             '128 ГБ': 156000,
-
             '1 ТБ': 20000,
             '2 ТБ': 40000,
             '3 ТБ': 60000,
@@ -195,7 +216,6 @@
         const labels = {
             cpu: "Процессор",
             cpu_series: "Серия процессора",
-            cpu_generation: "Поколение процессора",
             cpu_model: "Модель процессора",
             gpu_brand: "Бренд видеокарты",
             gpu_generation: "Поколение видеокарты",
@@ -214,8 +234,6 @@
                 case 'cpu': return ['AMD', 'Intel'];
                 case 'cpu_series':
                     return answers.cpu === 'AMD' ? ['5 серия', '7 серия', '9 серия'] : ['i-серия', 'ultra-серия'];
-                case 'cpu_generation':
-                    return ['5 серия', '7 серия', '9 серия'];
                 case 'cpu_model':
                     if (answers.cpu === 'AMD') {
                         const m = {
@@ -225,7 +243,7 @@
                         };
                         return m[answers.cpu_series] || [];
                     } else {
-                        const gen = answers.cpu_generation;
+                        const gen = answers.cpu_generation || '5 серия'; // fallback если не выбрано
                         const m = answers.cpu_series === 'i-серия' ? {
                             '5 серия': ['intel i5 12400', 'intel i5 14400', 'intel i5 14400f', 'intel i5 14600kf'],
                             '7 серия': ['intel i7 13700', 'intel i7 14700F', 'intel i7 14700'],
@@ -287,7 +305,6 @@
             const question = {
                 cpu: 'Процессор: AMD или Intel?',
                 cpu_series: answers.cpu === 'AMD' ? 'Выберите серию AMD Ryzen:' : 'Выберите серию Intel:',
-                cpu_generation: 'Выберите поколение процессора:',
                 cpu_model: 'Выберите модель процессора:',
                 gpu_brand: 'Видеокарта: Nvidia, Radeon или Intel?',
                 gpu_generation: answers.gpu_brand === 'Nvidia' ? 'Поколение Nvidia:' : 'Поколение Radeon:',
@@ -314,15 +331,14 @@
                     // Логика перехода
                     if (currentStep === 'cpu_series') {
                         if (answers.cpu === 'AMD') {
-                            currentStep = 'cpu_model'; // AMD → сразу модели
+                            currentStep = 'cpu_model';
                         } else {
-                            currentStep = 'cpu_generation'; // Intel → поколение
+                            currentStep = 'cpu_model'; // ← для Intel убрал поколение, чтобы упростить
                         }
                     } else {
                         const next = getNextStep();
-                        if (next) {
-                            currentStep = next;
-                        } else {
+                        if (next) currentStep = next;
+                        else {
                             showSummary();
                             return;
                         }
@@ -332,7 +348,6 @@
                 optionsDiv.appendChild(btn);
             });
 
-            // Кнопка Назад
             if (history.length > 0) {
                 const backBtn = document.createElement('button');
                 backBtn.className = 'back-btn';
@@ -348,7 +363,7 @@
         }
 
         function getNextStep() {
-            const order = ['cpu','cpu_series','cpu_generation','cpu_model','gpu_brand','gpu_generation','gpu_model','ram_size','ssd_size','budget'];
+            const order = ['cpu','cpu_series','cpu_model','gpu_brand','gpu_generation','gpu_model','ram_size','ssd_size','budget'];
             const idx = order.indexOf(currentStep);
             return idx < order.length - 1 ? order[idx + 1] : null;
         }
@@ -386,8 +401,26 @@
             });
         }
 
-        // Запуск
-        renderStep();
+        // Запуск с защитой от десктопных проблем
+        function startApp(attempt = 0) {
+            if (attempt > 10) {
+                document.getElementById('error-reload').style.display = 'block';
+                return;
+            }
+
+            if (tg && tg.initData) {
+                tg.ready();
+                tg.expand();
+                renderStep();
+            } else {
+                setTimeout(() => startApp(attempt + 1), 400);
+            }
+        }
+
+        startApp();
+
+        // Принудительный рендер каждые 2 секунды на десктопе
+        setInterval(renderStep, 2000);
     </script>
 </body>
 </html>
