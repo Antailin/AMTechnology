@@ -309,13 +309,19 @@
                 btn.onclick = () => {
                     answers[currentStep] = opt;
                     history.push(currentStep);
-                    const next = getNextStep();
-                    if (next) {
-                        currentStep = next;
-                        renderStep();
+
+                    // Правильный переход: для AMD пропускаем cpu_generation
+                    if (currentStep === 'cpu_series' && answers.cpu === 'AMD') {
+                        currentStep = 'cpu_model';
                     } else {
-                        showSummary();
+                        const next = getNextStep();
+                        if (next) currentStep = next;
+                        else {
+                            showSummary();
+                            return;
+                        }
                     }
+                    renderStep();
                 };
                 optionsDiv.appendChild(btn);
             });
