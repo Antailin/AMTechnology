@@ -84,6 +84,12 @@
             margin-top: 30px;
             color: #bb86fc;
         }
+        #status {
+            text-align: center;
+            margin-top: 20px;
+            color: #bbb;
+            font-size: 1.1em;
+        }
     </style>
 </head>
 <body>
@@ -91,12 +97,21 @@
         <h1>Сборка ПК</h1>
         <div id="steps"></div>
         <div id="summary"></div>
+        <div id="status"></div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
+        tg.enableClosingConfirmation();  // просим подтверждение закрытия
+
+        // Проверка инициализации WebApp
+        if (!tg.initData || !tg.initDataUnsafe) {
+            console.error("[MiniApp] Telegram WebApp НЕ инициализировался!");
+            document.getElementById('status').innerHTML = 
+                '<span style="color:#ff5555">Ошибка запуска Mini App. Попробуйте открыть в мобильном Telegram.</span>';
+        }
 
         const PRICES = {
             'AMD Ryzen 5 8500G': 19000,
@@ -216,7 +231,7 @@
                         };
                         return m[answers.cpu_series] || [];
                     } else {
-                        const gen = answers.cpu_generation || '5 серия'; // fallback
+                        const gen = answers.cpu_generation || '5 серия';
                         const m = answers.cpu_series === 'i-серия' ? {
                             '5 серия': ['intel i5 12400', 'intel i5 14400', 'intel i5 14400f', 'intel i5 14600kf'],
                             '7 серия': ['intel i7 13700', 'intel i7 14700F', 'intel i7 14700'],
@@ -305,7 +320,7 @@
                         if (answers.cpu === 'AMD') {
                             currentStep = 'cpu_model';
                         } else {
-                            currentStep = 'cpu_model'; // упростил для Intel
+                            currentStep = 'cpu_model';
                         }
                     } else {
                         const next = getNextStep();
@@ -348,26 +363,6 @@
             return total;
         }
 
-        // Принудительная отправка через fetch (fallback для GitHub Pages и проблем с sendData)
-        function fallbackSend() {
-            const data = JSON.stringify(answers);
-            const token = '8435864770:AAE7ImIPdSzaK7Q86LV4b55qfr49ej18zXw';  // ← ОБЯЗАТЕЛЬНО ЗАМЕНИ НА СВОЙ ТОКЕН
-            const chatId = tg.initDataUnsafe?.user?.id || -1003744446339; // ← твой chat_id для теста
-
-            fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: chatId,
-                    text: 'Данные из Mini App (fallback):\n' + data
-                })
-            })
-            .then(response => response.json())
-            .then(result => console.log('Fallback отправлено:', result))
-            .catch(err => console.error('Ошибка fallback:', err))
-            .finally(() => tg.close());
-        }
-
         function showSummary() {
             document.getElementById('steps').style.display = 'none';
             const summary = document.getElementById('summary');
@@ -382,20 +377,44 @@
             }
             html += '</div>';
             html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
+            html += '<p id="status-text" style="text-align:center; color:#bbb; margin-top:20px;">Отправка данных...</p>';
 
             summary.innerHTML = html;
 
-            // Основная отправка + fallback
             const dataToSend = JSON.stringify(answers);
-            console.log("Попытка отправить через tg.sendData:", dataToSend);
+            console.log("[MiniApp] Данные для отправки:", dataToSend);
 
-            tg.sendData(dataToSend);
+            // Показываем кнопку
+            tg.MainButton.setText('Отправить сборку');
+            tg.MainButton.show();
 
-            // Fallback через 500 мс
-            setTimeout(fallbackSend, 500);
+            // Обработчик нажатия на MainButton
+            tg.MainButton.onClick(() => {
+                document.getElementById('status-text').innerHTML = "Отправляем...";
+                console.log("[MiniApp] Нажата кнопка — отправляем");
+
+                tg.sendData(dataToSend);
+
+                // Задержка перед закрытием — даём Telegram время отправить данные
+                setTimeout(() => {
+                    console.log("[MiniApp] Закрываем приложение");
+                    document.getElementById('status-text').innerHTML = "Отправлено. Закрываем...";
+                    tg.close();
+                }, 1000);  // 1000 мс = 1 секунда
+            });
+
+            // Автоотправка через 8 секунд, если пользователь не нажал
+            setTimeout(() => {
+                if (tg.MainButton.isVisible) {
+                    document.getElementById('status-text').innerHTML = "Автоотправка...";
+                    console.log("[MiniApp] Автоотправка");
+                    tg.sendData(dataToSend);
+                    setTimeout(() => tg.close(), 1000);
+                }
+            }, 8000);
         }
 
-        // Запуск
+        // Запуск приложения
         renderStep();
     </script>
 </body>
