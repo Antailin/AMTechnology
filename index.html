@@ -370,38 +370,34 @@
         }
 
         function showSummary() {
-            document.getElementById('steps').style.display = 'none';
-            const summary = document.getElementById('summary');
-            summary.style.display = 'block';
+    document.getElementById('steps').style.display = 'none';
+    const summary = document.getElementById('summary');
+    summary.style.display = 'block';
 
-            let html = '<div class="summary-title">Ваша сборка готова!</div>';
-            html += '<div class="options">';
-            for (let key in answers) {
-                const label = labels[key] || key;
-                const value = answers[key];
-                html += `<div class="component"><span>${label}:</span><span>${value}</span></div>`;
-            }
-            html += '</div>';
-            html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
-            html += '<div id="status">Отправляем данные в бот...</div>';
+    let html = '<div class="summary-title">Ваша сборка готова!</div>';
+    html += '<div class="options">';
+    for (let key in answers) {
+        html += `<div class="component"><span>${labels[key] || key}:</span><span>${answers[key]}</span></div>`;
+    }
+    html += '</div>';
+    html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
+    html += '<div id="status">Отправка...</div>';
 
-            summary.innerHTML = html;
+    summary.innerHTML = html;
 
-            const dataToSend = JSON.stringify(answers);
-            console.log("[MiniApp] Данные к отправке:", dataToSend);
+    const data = JSON.stringify(answers);
+    console.log("Отправляем:", data);
 
-            // Отправляем данные
-            tg.sendData(dataToSend);
+    tg.sendData(data);
 
-            // Задержка 1.5 секунды перед закрытием — Telegram обычно успевает за 400–800 мс
-            setTimeout(() => {
-                document.getElementById('status').innerHTML = "Данные отправлены ✓ Закрываем...";
-                tg.close();
-            }, 1500);
-        }
+    document.getElementById('status').innerHTML = "Данные отправлены. Закрываем...";
+
+    setTimeout(() => tg.close(), 2000);  // 2 секунды — достаточно
+}
 
         // Запуск
         renderStep();
     </script>
 </body>
 </html>
+
