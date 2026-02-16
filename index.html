@@ -86,9 +86,12 @@
         }
         #status {
             text-align: center;
-            margin-top: 20px;
-            color: #bbb;
-            font-size: 1.1em;
+            margin-top: 25px;
+            font-size: 1.2em;
+            color: #4ade80;
+        }
+        .error {
+            color: #ff5555 !important;
         }
     </style>
 </head>
@@ -97,20 +100,23 @@
         <h1>Сборка ПК</h1>
         <div id="steps"></div>
         <div id="summary"></div>
-        <div id="status"></div>
+        <div id="status">Загрузка...</div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-        tg.enableClosingConfirmation();  // просим подтверждение закрытия
 
-        // Проверка инициализации WebApp
-        if (!tg.initData || !tg.initDataUnsafe) {
-            console.error("[MiniApp] Telegram WebApp НЕ инициализировался!");
+        // Проверка, что WebApp загрузился
+        if (!tg || !tg.initData) {
             document.getElementById('status').innerHTML = 
-                '<span style="color:#ff5555">Ошибка запуска Mini App. Попробуйте открыть в мобильном Telegram.</span>';
+                '<span class="error">Ошибка: Telegram WebApp не инициализирован. Откройте в мобильном Telegram.</span>';
+            console.error("[MiniApp] Telegram.WebApp не найден");
+        } else {
+            tg.ready();
+            tg.expand();
+            tg.enableClosingConfirmation();
+            console.log("[MiniApp] WebApp успешно инициализирован");
+            document.getElementById('status').innerHTML = "Готово к сборке";
         }
 
         const PRICES = {
@@ -377,44 +383,24 @@
             }
             html += '</div>';
             html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
-            html += '<p id="status-text" style="text-align:center; color:#bbb; margin-top:20px;">Отправка данных...</p>';
+            html += '<div id="status">Отправляем данные в бот...</div>';
 
             summary.innerHTML = html;
 
             const dataToSend = JSON.stringify(answers);
-            console.log("[MiniApp] Данные для отправки:", dataToSend);
+            console.log("[MiniApp] Данные к отправке:", dataToSend);
 
-            // Показываем кнопку
-            tg.MainButton.setText('Отправить сборку');
-            tg.MainButton.show();
+            // Отправляем данные
+            tg.sendData(dataToSend);
 
-            // Обработчик нажатия на MainButton
-            tg.MainButton.onClick(() => {
-                document.getElementById('status-text').innerHTML = "Отправляем...";
-                console.log("[MiniApp] Нажата кнопка — отправляем");
-
-                tg.sendData(dataToSend);
-
-                // Задержка перед закрытием — даём Telegram время отправить данные
-                setTimeout(() => {
-                    console.log("[MiniApp] Закрываем приложение");
-                    document.getElementById('status-text').innerHTML = "Отправлено. Закрываем...";
-                    tg.close();
-                }, 1000);  // 1000 мс = 1 секунда
-            });
-
-            // Автоотправка через 8 секунд, если пользователь не нажал
+            // Задержка 1.5 секунды перед закрытием — Telegram обычно успевает за 400–800 мс
             setTimeout(() => {
-                if (tg.MainButton.isVisible) {
-                    document.getElementById('status-text').innerHTML = "Автоотправка...";
-                    console.log("[MiniApp] Автоотправка");
-                    tg.sendData(dataToSend);
-                    setTimeout(() => tg.close(), 1000);
-                }
-            }, 8000);
+                document.getElementById('status').innerHTML = "Данные отправлены ✓ Закрываем...";
+                tg.close();
+            }, 1500);
         }
 
-        // Запуск приложения
+        // Запуск
         renderStep();
     </script>
 </body>
