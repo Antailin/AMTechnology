@@ -78,7 +78,7 @@
             font-size: 1.1em;
         }
         .total {
-            font-size: 1.8em;
+            font-size: 1.9em;
             font-weight: bold;
             text-align: center;
             margin-top: 30px;
@@ -98,8 +98,8 @@
         tg.ready();
         tg.expand();
 
-        // Полный объект PRICES
         const PRICES = {
+            // Процессоры AMD
             'AMD Ryzen 5 8500G': 19000,
             'AMD Ryzen 5 8600G': 23000,
             'AMD Ryzen 7 7700': 23500,
@@ -117,6 +117,7 @@
             'AMD Ryzen 9 9950X': 52000,
             'AMD Ryzen 9 9950X3D': 69000,
 
+            // Процессоры Intel
             'intel i5 12400': 12000,
             'intel i5 14400': 21000,
             'intel i5 14400f': 18000,
@@ -135,6 +136,7 @@
             'Intel Core Ultra 7 265K OEM': 27000,
             'Intel Core Ultra 9 285K oem': 49900,
 
+            // Видеокарты Nvidia
             '3060': 24000,
             '3060ti': 30000,
             '3070': 35000,
@@ -161,6 +163,7 @@
             '5080': 140000,
             '5090': 329000,
 
+            // Radeon
             'Radeon RX 6750 GRE 10 GB': 35000,
             'Radeon RX 6750 GRE 12 GB': 40000,
             'Radeon RX 7400': 45000,
@@ -177,14 +180,17 @@
             'Radeon RX 9070 GRE': 50000,
             'Radeon RX 9070 XT': 55000,
 
+            // Intel Arc
             'Arc B580': 39000,
             'Arc B570': 35000,
 
+            // Оперативная память
             '16 ГБ': 18000,
             '32 ГБ': 35000,
             '64 ГБ': 80000,
             '128 ГБ': 156000,
 
+            // SSD
             '1 ТБ': 20000,
             '2 ТБ': 40000,
             '3 ТБ': 60000,
@@ -207,7 +213,7 @@
         };
 
         const answers = {};
-        const history = [];           // для кнопки "Назад"
+        const history = [];
         let currentStep = 'cpu';
 
         function getOptions() {
@@ -360,25 +366,20 @@
             for (let key in answers) {
                 const label = labels[key] || key;
                 const value = answers[key];
-                const price = PRICES[value] || 0;
-                html += `<div class="component"><span>${label}:</span><span>${value} ${price ? '— ' + price.toLocaleString() + ' ₽' : ''}</span></div>`;
+                html += `<div class="component"><span>${label}:</span><span>${value}</span></div>`;
             }
             html += '</div>';
             html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
-            html += '<button id="send-btn">Отправить сборку</button>';
 
             summary.innerHTML = html;
 
-            document.getElementById('send-btn').onclick = sendAssembly;
-
+            // Только Telegram MainButton
             tg.MainButton.setText('Отправить сборку');
             tg.MainButton.show();
-            tg.MainButton.onClick(sendAssembly);
-        }
-
-        function sendAssembly() {
-            tg.sendData(JSON.stringify(answers));
-            setTimeout(() => tg.close(), 400);
+            tg.MainButton.onClick(() => {
+                tg.sendData(JSON.stringify(answers));
+                setTimeout(() => tg.close(), 400);
+            });
         }
 
         // Запуск
