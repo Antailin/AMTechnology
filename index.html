@@ -377,29 +377,42 @@
         }
 
         function showSummary() {
-            document.getElementById('steps').style.display = 'none';
-            const summary = document.getElementById('summary');
-            summary.style.display = 'block';
+    document.getElementById('steps').style.display = 'none';
+    const summary = document.getElementById('summary');
+    summary.style.display = 'block';
 
-            let html = '<div class="summary-title">Ваша сборка готова!</div>';
-            html += '<div class="options">';
-            for (let key in answers) {
-                const label = labels[key] || key;
-                const value = answers[key];
-                html += `<div class="component"><span>${label}:</span><span>${value}</span></div>`;
-            }
-            html += '</div>';
-            html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
+    let html = '<div class="summary-title">Ваша сборка готова!</div>';
+    html += '<div class="options">';
+    for (let key in answers) {
+        const label = labels[key] || key;
+        const value = answers[key];
+        html += `<div class="component"><span>${label}:</span><span>${value}</span></div>`;
+    }
+    html += '</div>';
+    html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
 
-            summary.innerHTML = html;
+    // Инструкция для пользователя
+    html += '<p style="text-align:center; margin-top:20px; color:#bbb;">Нажмите кнопку внизу экрана</p>';
 
-            tg.MainButton.setText('Отправить сборку');
-            tg.MainButton.show();
-            tg.MainButton.onClick(() => {
-                tg.sendData(JSON.stringify(answers));
-                setTimeout(() => tg.close(), 400);
-            });
+    summary.innerHTML = html;
+
+    // Самое важное — отправляем данные ДО закрытия
+    const sendAndClose = () => {
+        tg.sendData(JSON.stringify(answers));
+        setTimeout(() => tg.close(), 600); // даём 600 мс на отправку
+    };
+
+    tg.MainButton.setText('Отправить сборку');
+    tg.MainButton.show();
+    tg.MainButton.onClick(sendAndClose);
+
+    // Дополнительная защита — если MainButton не сработал
+    setTimeout(() => {
+        if (tg.MainButton.isVisible) {
+            sendAndClose();
         }
+    }, 8000); // автоотправка через 8 секунд, если пользователь не нажал
+}
 
         // Запуск с защитой от десктопных проблем
         function startApp(attempt = 0) {
@@ -424,3 +437,4 @@
     </script>
 </body>
 </html>
+
