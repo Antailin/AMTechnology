@@ -100,23 +100,16 @@
         <h1>Сборка ПК</h1>
         <div id="steps"></div>
         <div id="summary"></div>
-        <div id="status">Загрузка...</div>
+        <div id="status"></div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
 
-        // Проверка, что WebApp загрузился
-        if (!tg || !tg.initData) {
-            document.getElementById('status').innerHTML = 
-                '<span class="error">Ошибка: Telegram WebApp не инициализирован. Откройте в мобильном Telegram.</span>';
-            console.error("[MiniApp] Telegram.WebApp не найден");
-        } else {
+        if (tg && tg.initData) {
             tg.ready();
             tg.expand();
             tg.enableClosingConfirmation();
-            console.log("[MiniApp] WebApp успешно инициализирован");
-            document.getElementById('status').innerHTML = "Готово к сборке";
         }
 
         const PRICES = {
@@ -210,6 +203,7 @@
         const labels = {
             cpu: "Процессор",
             cpu_series: "Серия процессора",
+            cpu_generation: "Поколение",
             cpu_model: "Модель процессора",
             gpu_brand: "Бренд видеокарты",
             gpu_generation: "Поколение видеокарты",
@@ -225,9 +219,19 @@
 
         function getOptions() {
             switch (currentStep) {
-                case 'cpu': return ['AMD', 'Intel'];
+                case 'cpu':
+                    return ['AMD', 'Intel'];
+
                 case 'cpu_series':
-                    return answers.cpu === 'AMD' ? ['5 серия', '7 серия', '9 серия'] : ['i-серия', 'ultra-серия'];
+                    // AMD: 5/7/9 серия | Intel: i-серия / ultra-серия
+                    return answers.cpu === 'AMD'
+                        ? ['5 серия', '7 серия', '9 серия']
+                        : ['i-серия', 'ultra-серия'];
+
+                case 'cpu_generation':
+                    // Только для Intel — выбор поколения перед моделью
+                    return ['5 серия', '7 серия', '9 серия'];
+
                 case 'cpu_model':
                     if (answers.cpu === 'AMD') {
                         const m = {
@@ -237,7 +241,7 @@
                         };
                         return m[answers.cpu_series] || [];
                     } else {
-                        const gen = answers.cpu_generation || '5 серия';
+                        const gen = answers.cpu_generation;
                         const m = answers.cpu_series === 'i-серия' ? {
                             '5 серия': ['intel i5 12400', 'intel i5 14400', 'intel i5 14400f', 'intel i5 14600kf'],
                             '7 серия': ['intel i7 13700', 'intel i7 14700F', 'intel i7 14700'],
@@ -249,9 +253,15 @@
                         };
                         return m[gen] || [];
                     }
-                case 'gpu_brand': return ['Nvidia', 'Radeon', 'Intel'];
+
+                case 'gpu_brand':
+                    return ['Nvidia', 'Radeon', 'Intel'];
+
                 case 'gpu_generation':
-                    return answers.gpu_brand === 'Nvidia' ? ['30 серии', '40 серии', '50 серии'] : ['6000 серии', '7000 серии', '9000 серии'];
+                    return answers.gpu_brand === 'Nvidia'
+                        ? ['30 серии', '40 серии', '50 серии']
+                        : ['6000 серии', '7000 серии', '9000 серии'];
+
                 case 'gpu_model':
                     if (answers.gpu_brand === 'Intel') return ['Arc B580', 'Arc B570'];
                     const gen = answers.gpu_generation;
@@ -270,8 +280,13 @@
                         };
                         return m[gen] || [];
                     }
-                case 'ram_size': return ['16 ГБ', '32 ГБ', '64 ГБ', '128 ГБ'];
-                case 'ssd_size': return ['1 ТБ', '2 ТБ', '3 ТБ', '4 ТБ', '5 ТБ', '6 ТБ'];
+
+                case 'ram_size':
+                    return ['16 ГБ', '32 ГБ', '64 ГБ', '128 ГБ'];
+
+                case 'ssd_size':
+                    return ['1 ТБ', '2 ТБ', '3 ТБ', '4 ТБ', '5 ТБ', '6 ТБ'];
+
                 case 'budget': {
                     const total = calculateTotal();
                     let opts = [];
@@ -283,13 +298,33 @@
                         });
                         const lower = total - 50000;
                         if (lower >= 100000) opts.push(`до ${Math.round(lower/1000)}к`);
-                        opts.sort((a,b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]));
+                        opts.sort((a, b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]));
                         opts.push('500+к');
                     }
                     return opts;
                 }
             }
             return [];
+        }
+
+        function getNextStep() {
+            switch (currentStep) {
+                case 'cpu':         return 'cpu_series';
+                case 'cpu_series':
+                    // AMD → сразу к модели, Intel → сначала поколение
+                    return answers.cpu === 'AMD' ? 'cpu_model' : 'cpu_generation';
+                case 'cpu_generation': return 'cpu_model';
+                case 'cpu_model':   return 'gpu_brand';
+                case 'gpu_brand':
+                    // Intel GPU → сразу к модели, остальные → поколение
+                    return answers.gpu_brand === 'Intel' ? 'gpu_model' : 'gpu_generation';
+                case 'gpu_generation': return 'gpu_model';
+                case 'gpu_model':   return 'ram_size';
+                case 'ram_size':    return 'ssd_size';
+                case 'ssd_size':    return 'budget';
+                case 'budget':      return null;
+            }
+            return null;
         }
 
         function renderStep() {
@@ -299,6 +334,7 @@
             const question = {
                 cpu: 'Процессор: AMD или Intel?',
                 cpu_series: answers.cpu === 'AMD' ? 'Выберите серию AMD Ryzen:' : 'Выберите серию Intel:',
+                cpu_generation: 'Выберите поколение:',
                 cpu_model: 'Выберите модель процессора:',
                 gpu_brand: 'Видеокарта: Nvidia, Radeon или Intel?',
                 gpu_generation: answers.gpu_brand === 'Nvidia' ? 'Поколение Nvidia:' : 'Поколение Radeon:',
@@ -322,21 +358,13 @@
                     answers[currentStep] = opt;
                     history.push(currentStep);
 
-                    if (currentStep === 'cpu_series') {
-                        if (answers.cpu === 'AMD') {
-                            currentStep = 'cpu_model';
-                        } else {
-                            currentStep = 'cpu_model';
-                        }
+                    const next = getNextStep();
+                    if (next) {
+                        currentStep = next;
+                        renderStep();
                     } else {
-                        const next = getNextStep();
-                        if (next) currentStep = next;
-                        else {
-                            showSummary();
-                            return;
-                        }
+                        showSummary();
                     }
-                    renderStep();
                 };
                 optionsDiv.appendChild(btn);
             });
@@ -355,49 +383,42 @@
             container.appendChild(stepDiv);
         }
 
-        function getNextStep() {
-            const order = ['cpu','cpu_series','cpu_model','gpu_brand','gpu_generation','gpu_model','ram_size','ssd_size','budget'];
-            const idx = order.indexOf(currentStep);
-            return idx < order.length - 1 ? order[idx + 1] : null;
-        }
-
         function calculateTotal() {
             let total = 0;
-            ['cpu_model','gpu_model','ram_size','ssd_size'].forEach(k => {
+            ['cpu_model', 'gpu_model', 'ram_size', 'ssd_size'].forEach(k => {
                 if (answers[k] && PRICES[answers[k]]) total += PRICES[answers[k]];
             });
             return total;
         }
 
         function showSummary() {
-    document.getElementById('steps').style.display = 'none';
-    const summary = document.getElementById('summary');
-    summary.style.display = 'block';
+            document.getElementById('steps').style.display = 'none';
+            const summary = document.getElementById('summary');
+            summary.style.display = 'block';
 
-    let html = '<div class="summary-title">Ваша сборка готова!</div>';
-    html += '<div class="options">';
-    for (let key in answers) {
-        html += `<div class="component"><span>${labels[key] || key}:</span><span>${answers[key]}</span></div>`;
-    }
-    html += '</div>';
-    html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
-    html += '<div id="status">Отправка...</div>';
+            let html = '<div class="summary-title">Ваша сборка готова!</div>';
+            html += '<div class="options">';
+            for (let key in answers) {
+                html += `<div class="component"><span>${labels[key] || key}:</span><span>${answers[key]}</span></div>`;
+            }
+            html += '</div>';
+            html += `<div class="total">Итого: ${calculateTotal().toLocaleString()} ₽</div>`;
+            summary.innerHTML = html;
 
-    summary.innerHTML = html;
+            const data = JSON.stringify(answers);
+            console.log("Отправляем:", data);
 
-    const data = JSON.stringify(answers);
-    console.log("Отправляем:", data);
-
-    tg.sendData(data);
-
-    document.getElementById('status').innerHTML = "Данные отправлены. Закрываем...";
-
-    setTimeout(() => tg.close(), 2000);  // 2 секунды — достаточно
-}
+            tg.MainButton.setText('📨 Отправить сборку');
+            tg.MainButton.show();
+            tg.MainButton.onClick(() => {
+                tg.MainButton.disable();
+                tg.MainButton.showProgress(true);
+                tg.sendData(data);
+            });
+        }
 
         // Запуск
         renderStep();
     </script>
 </body>
 </html>
-
